@@ -12,25 +12,24 @@ const newsSchema = new Schema(
       type: String,
       required: true,
     },
-    auther: { type: String, required: true },
-    creationdate: {
-      type: Date,
-      default: () => {
+    owner: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      ref: "Reporter",
+    },
+    image: {
+      type: Buffer,
+    },
+  },
+  {
+    timestamps: {
+      currentTime: () => {
         var now = new Date();
         now.setHours(now.getHours() + 2);
         return now;
       },
     },
   }
-  // {
-  //   timestamps: {
-  //     currentTime: () => {
-  //       var now = new Date();
-  //       now.setHours(now.getHours() + 2);
-  //       return now;
-  //     },
-  //   },
-  //}
 );
 
 const news = mongoose.model("News", newsSchema);

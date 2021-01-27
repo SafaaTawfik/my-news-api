@@ -1,9 +1,12 @@
 const express = require("express");
 const newsRouter = new express.Router();
 const News = require("../models/news");
+const auth = require("../middleware/auth");
+const multer = require("multer");
+const reporterRouter = require("./reporterRouter");
 
 //get all news
-newsRouter.get("/news", (req, resp) => {
+newsRouter.get("/news", auth, (req, resp) => {
   News.find({})
     .then((allnews) => {
       resp.status(200).send(allnews);
@@ -14,7 +17,7 @@ newsRouter.get("/news", (req, resp) => {
 });
 
 //Get report by ID
-newsRouter.get("/news/:id", (req, resp) => {
+newsRouter.get("/news/:id", auth, (req, resp) => {
   const _id = req.params.id;
   News.findById(_id)
     .then((report) => {
@@ -31,9 +34,9 @@ newsRouter.get("/news/:id", (req, resp) => {
 
 //update report by ID
 
-newsRouter.put("/news/:id", async (req, res) => {
+newsRouter.put("/news/:id", auth, async (req, res) => {
   const updatesparam = Object.keys(req.body);
-  const allowedupdates = ["tittle", "description", "auther"];
+  const allowedupdates = ["tittle", "description"];
   const isvalid = updatesparam.every((updatename) =>
     allowedupdates.includes(updatename)
   );
@@ -58,7 +61,7 @@ newsRouter.put("/news/:id", async (req, res) => {
 });
 
 //Delete by ID
-newsRouter.delete("/news/:id", async (req, res) => {
+newsRouter.delete("/news/:id", auth, async (req, res) => {
   const _id = req.params.id;
   try {
     const article = await News.findByIdAndDelete(_id);
@@ -73,9 +76,9 @@ newsRouter.delete("/news/:id", async (req, res) => {
 
 //Add new Article
 
-newsRouter.post("/news/:id", (req, resp) => {
+newsRouter.post("/news/", auth, (req, resp) => {
   const newarticleparam = Object.keys(req.body);
-  const allowedparams = ["tittle", "description", "auther"];
+  const allowedparams = ["tittle", "description"];
   const isvalid = newarticleparam.every((param) =>
     allowedparams.includes(param)
   );
@@ -86,8 +89,10 @@ newsRouter.post("/news/:id", (req, resp) => {
         "There are Some invalid Params,please use tittle,description and auther only"
       );
   }
-
-  const article = new News(req.body);
+  const article = new News({
+    ...req.body,
+    owner: req.reporter._id,
+  });
   article
     .save()
     .then(() => {
@@ -97,5 +102,37 @@ newsRouter.post("/news/:id", (req, resp) => {
       resp.status(400).send(error);
     });
 });
+
+const uploads = multer({
+  limits: {
+    fileSize: 1000000,
+  },
+  fileFilter(req, file, cb) {
+    if (!file.originalname.match(/\.(jpg|jpeg|png|jfif)$/)) {
+      return cb(new Error("Please upload an image"));
+    }
+    cb(undefined, true);
+  },
+});
+
+reporterRouter.post(
+  "/news/upload/:id",
+  auth,
+  uploads.single("image"),
+  async (req, res) => {
+    const _id = req.params.id;
+    try {
+      const article = await News.findById(_id);
+      if (!article) {
+        return res.send("No article is found with this id");
+      }
+      article.image = req.file.buffer;
+      await article.save();
+      res.status(200).send(article);
+    } catch (e) {
+      res.send(e);
+    }
+  }
+);
 
 module.exports = newsRouter;
